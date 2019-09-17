@@ -1,0 +1,77 @@
+# Port mapping
+--publish -p    host:container
+
+# ssh into the container
+sudo docker exec -it NameOfContainer /bin/bash
+
+# Tail logs
+sudo docker logs -f gitlab
+
+# Volume mapping
+ --volume -v /path/in/host:/path/in/docker
+
+# Limit memory
+--memory= '4096MB'
+
+# Limit CPU this is a bit tricky because there are many options and depends on where the docker container is running
+
+# Copy stuff from the container to host
+docker cp CONTAINER:/container/path/to /local/host/path
+
+# Docker status
+docker stats [optionalContainer]
+
+--gitlab
+sudo docker run --detach \
+  --hostname odin.com \
+  --publish 443:443 --publish 80:80 --publish 22:22 \
+  --name gitlab \
+  --restart always \
+  --volume /srv/gitlab/config:/etc/gitlab \
+  --volume /srv/gitlab/logs:/var/log/gitlab \
+  --volume /srv/gitlab/data:/var/opt/gitlab \
+  gitlab/gitlab-ce:latest
+
+-- mariadb
+sudo docker run --name mariadb \
+-e MYSQL_ROOT_PASSWORD=mypass \
+-d mariadb/server:10.3
+
+
+-- apache
+sudo docker run --detach \
+ --name apache \
+ -v /srv/apache/logs:/usr/local/apache2/logs \
+ -v /srv/apache/conf/:/usr/local/apache2/conf/ \
+ -p 80:80 \
+ -p 8080:8080 \
+ -p 23:22 \
+ httpd:2.4
+
+
+ Vagrant
+
+ # Coyp files from vagrant
+ vagrant ssh -c "sudo cat /path/to/file/file" > file
+ vagrant ssh -c "sudo cat /srv/apache/conf/extra/httpd-vhosts.conf" > httpd-vhosts.conf
+
+  # OR use the plugin vagrant-scp
+  vagrant plugin install vagrant-scp
+  vagrant scp <some_local_file_or_dir> [vm_name]:<somewhere_on_the_vm>
+  - Example:
+  vagrant scp default:/srv/apache/conf apache
+
+ <VirtualHost *:80>
+    ServerAdmin webmaster@gitlab.git.com
+    DocumentRoot "/usr/local/apache2/docs/gitlab.git.com"
+    ServerName gitlab.git.com
+    ServerAlias www.gitlab.git.com
+    ErrorLog "logs/gitlab.git.com-error_log"
+    CustomLog "logs/gitlab.git.com-access_log" common
+        <Location />
+                ProxyPass http://localhost:81/
+                ProxyPassReverse http://localhost:81/
+                Order allow,deny
+                Allow from all
+        </Location>
+</VirtualHost>
