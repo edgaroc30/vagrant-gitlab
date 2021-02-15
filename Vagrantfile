@@ -8,38 +8,89 @@ Vagrant.configure("2") do |config|
     # Limit the number of CPUs available for this VM
     vb.customize ["modifyvm", :id, "--cpus", 2]
     # Limit the CPU usage for this VM in the host
-    vb.customize ["modifyvm", :id, "--cpuexecutioncap", "50"]
+    vb.customize ["modifyvm", :id, "--cpuexecutioncap", "70"]
   end
 
   # Port mapping
 
-  config.vm.network "forwarded_port", guest: 80, host: 8080
-  config.vm.network "forwarded_port", guest: 22, host: 22
-  config.vm.network "forwarded_port", guest: 443, host: 443
-  config.vm.network "forwarded_port", guest: 81, host: 8081
-  config.vm.network "forwarded_port", guest: 23, host: 23
-  config.vm.network "forwarded_port", guest: 444, host: 444
+  # GITLAB
+  config.vm.network "forwarded_port", guest: 443, host: 443 #GITLAB
+  config.vm.network "forwarded_port", guest: 80, host: 80 #GITLAB
+  # config.vm.network "forwarded_port", guest: 23, host: 22 #GITLAB
+
+  # SQL Containers
+  config.vm.network "forwarded_port", guest: 1433, host: 1433 #SQLDEV
+  config.vm.network "forwarded_port", guest: 1443, host: 1443 #SQLQA
+  config.vm.network "forwarded_port", guest: 1453, host: 1453 #SQLPRD
+
   config.vm.network "public_network", type: "dhcp"
 
-  # Gitlab docker provision with a 4 GB RAM limit
+  # Gitlab docker provision with a 4 GB RAM limit + 1 SQL Containers with 2 GB RAM Limit
 
   config.vm.provision "docker" do |d|
-    d.run "gitlab/gitlab-ce:latest",
+  #  d.run "gitlab/gitlab-ce:latest",
+  #    # cmd: "bash -l",
+  #    args: "--detach  \
+  #    --hostname gitlab.git.com \
+  #    --publish 443:443 \
+  #    --publish 80:80 \
+  #    --publish 23:22 \
+  #    --name gitlab \
+  #    --restart always \
+  #    --volume /srv/gitlab/config:/etc/gitlab \
+  #    --volume /srv/gitlab/logs:/var/log/gitlab \
+  #    --volume /srv/gitlab/data:/var/opt/gitlab \
+  #    --memory='4GB'"
+
+
+      d.pull_images "mcr.microsoft.com/mssql/server:2019-CTP3.2-ubuntu"
+
+      d.run "sqlserver-prd",
       # cmd: "bash -l",
       args: "--detach  \
-      --hostname gitlab.git.com \
-      --publish 444:443 \
-      --publish 8081:80 \
-      --publish 24:22 \
-      --name gitlab \
+      --publish 1453:1433 \
+      --name sqlprd \
       --restart always \
-      --volume /srv/gitlab/config:/etc/gitlab \
-      --volume /srv/gitlab/logs:/var/log/gitlab \
-      --volume /srv/gitlab/data:/var/opt/gitlab \
-      --memory='4GB'"
-  end
-  # Copy apache configuration files from the host to the vm
-  # config.vm.provision "file", source: "/srv/apache/", destination: " /srv/apache/"
-  config.vm.provision :shell, path: "./provision/bootstrap.sh"
+      -e 'ACCEPT_EULA=Y' \
+      -e 'SA_PASSWORD=LWv9QWhPEk6A6nyv' \
+      -v /srv/sql/prd:/var/opt/mssql \
+      --memory='2GB'",
+      image: "mcr.microsoft.com/mssql/server:2019-CTP3.2-ubuntu"
 
-end
+
+      d.run "sqlserver-qa",
+      # cmd: "bash -l",
+      args: "--detach  \
+      --publish 1443:1433 \
+      --name sqlqa \
+      --restart always \
+      -e 'ACCEPT_EULA=Y' \
+      -e 'SA_PASSWORD=LWv9QWhPEk6A6nyv' \
+      -v /srv/sql/qa:/var/opt/mssql \
+      --memory='2GB'",
+      image: "mcr.microsoft.com/mssql/server:2019-CTP3.2-ubuntu"
+
+      # SQLDEV Server
+      d.run "sqlserver-dev",
+      # cmd: "bash -l",
+      args: "--detach  \
+      --publish 1433:1433 \
+      --name sqldev \
+      --restart always \
+      -e 'ACCEPT_EULA=Y' \
+      -e 'SA_PASSWORD=LWv9QWhPEk6A6nyv' \
+      -v /srv/sql/dev:/var/opt/mssql \
+      --memory='2GB'",
+      image: "mcr.microsoft.com/mssql/server:2019-CTP3.2-ubuntu"
+      
+  end
+
+  # sudo docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=LWv9QWhPEk6A6nyv' -p 1433:1433 --detach --memory='2GB' -v /srv/sql/prd:/var/opt/mssql -d mcr.microsoft.com/mssql/server:2017-latest 
+  config.vm.provision "file", source: "./provision/backup.bak", destination: "/home/vagrant"
+
+  config.vm.provision :shell, path: "./provision/bootstrap.sh"
+#  config.vm.provision "file", source: "./provision/backup.bak", destination: "/srv/sql/prd"
+#  config.vm.provision "file", source: "./provision/backup.bak", destination: "/srv/sql/qa"
+#  config.vm.provision "file", source: "./provision/backup.bak", destination: "/srv/sql/dev"
+
+end 
